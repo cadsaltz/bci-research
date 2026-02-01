@@ -13,3 +13,7 @@ numpy
 
 pip3 install <dependency>
 
+
+Link for online data set:
+https://physionet.org/content/eegmmidb/1.0.0/#files-panel
+
