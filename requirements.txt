@@ -1,5 +1,3 @@
-argparse
-sys
 mne
 matplotlib
 numpy
