@@ -156,7 +156,8 @@ def main():
 	clock = pygame.time.Clock()
 
 	# initiatlize with a grid on the window
-	root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
+	#root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
+	root = Panel((0,0,WIDTH,HEIGHT), 12, depth=0)
 	running = True
 
 	while running:
