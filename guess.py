@@ -64,7 +64,7 @@ def process_sample(sample):
 		#Look at a wall - get the "average" when you're not looking at a screen
 		if not is_calibrated:
 			# Count samples and sample
-			all_calib_corrs.append()
+			all_calib_corrs.append(current_corrs)
 			samples_counted += 1
 
 			if samples_counted % 25 == 0:
