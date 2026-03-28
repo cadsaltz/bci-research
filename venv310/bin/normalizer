@@ -1,4 +1,4 @@
-#!/home/caden-saltzberg/projects/bci/bci-research/venv310/bin/python3.10
+#!/Users/sameersahai/Projects/bci/bci-research/venv310/bin/python3.11
 import sys
 from charset_normalizer.cli import cli_detect
 if __name__ == '__main__':

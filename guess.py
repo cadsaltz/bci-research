@@ -1,13 +1,13 @@
-
 import sys
 import numpy as np
 from pyOpenBCI import OpenBCICyton
 from sklearn.cross_decomposition import CCA
+from scipy.signal import butter, filtfilt
 
 # -------------------- PARAMETERS --------------------
 fs = 250                 # Sampling rate (Hz)
 window_size = 250        # Samples in one analysis window
-channels_to_use = [6, 7, 0]  # EEG channels to include in X
+channels_to_use = [1, 2, 3]  # EEG channels to include in X
 frequency = [6,8,10,12]            # Frequency to test (Hz)
 
 calibration_limit = 500  # Number of samples to record baseline
@@ -15,7 +15,7 @@ samples_counted = 0 # Keep track of current samples
 is_calibrated = False # Are we calibrated??
 static_baseline = np.zeros(len(frequency)) # This will be our baseline once calibrated
 all_calib_corrs = [] # Temporary list to store correlations during lock-in
-threshold = 0.1 #Threshold for a "reading"
+threshold = 0.15 #Threshold for a "reading"
 
 # What the heck is Butterworth Bandpass Filter??? - we could look into this supposedly
 # it could help
@@ -29,12 +29,25 @@ t = np.arange(window_size) / fs
 
 Y_ref = []
 for freq in frequency:
-	Y = np.stack([np.sin(2 * np.pi * freq * t), np.cos(2 * np.pi * freq * t)], axis=1)  # shape: (window_size, 2)
-
+	Y = []
+	for k in range(1,3):
+		Y.append(np.sin(2 * np.pi * k * freq * t))
+		Y.append(np.cos(2 * np.pi * k * freq * t))
+	Y = np.stack(Y, axis=1)
 	Y_ref.append(Y)
 
+print("hi")
 # -------------------- CCA SETUP --------------------
 cca = CCA(n_components=1)
+
+
+# -------------------- BANDPASS FUNCTION --------------------
+
+def bandpass(data, fs, low=5, high=40,order=4):
+	nyq = 0.5 * fs
+	b, a = butter(order, [low/nyq, high/nyq], btype = 'band') #creates the filter
+	return filtfilt(b, a, data, axis=0) # actually filters
+
 
 # -------------------- PROCESSING FUNCTION --------------------
 def process_sample(sample):
@@ -46,12 +59,12 @@ def process_sample(sample):
 	buffer[:, -1] = sample.channels_data
 
 	# Only compute CCA after buffer is full
-	if np.all(buffer[:, -1] != 0):  # crude check: buffer filled
+	if np.all(buffer[:, -1] != 0):  
 		
 		# 3. Build X matrix (time × features)
 		X = buffer[channels_to_use].T  # shape: (window_size, num_channels)
 		# center EEG channels (mean=0)
-		X = X - np.mean(X, axis=0)
+		X = bandpass(X, fs)
 
 		current_corrs = []
 
@@ -107,7 +120,7 @@ def process_sample(sample):
 
 # -------------------- CONNECT TO BOARD --------------------
 try:
-	board = OpenBCICyton(port='/dev/ttyUSB0')
+	board = OpenBCICyton(port='/dev/cu.usbserial-D200QSOE')
 	print("Connected to OpenBCI Cyton.")
 except Exception as e:
 	print("Unable to connect to board:", e)

@@ -142,8 +142,8 @@ class Grid:
 
 
 # size of the window
-WIDTH = 1200
-HEIGHT = 720
+WIDTH = 1020
+HEIGHT = 1020
 
 
 def main():
@@ -157,7 +157,7 @@ def main():
 
 	# initiatlize with a grid on the window
 	#root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
-	root = Panel((0,0,WIDTH,HEIGHT), 12, depth=0)
+	root = Panel((0,0,WIDTH,HEIGHT), 6, depth=0)
 	running = True
 
 	while running:
