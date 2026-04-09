@@ -7,8 +7,8 @@ from scipy.signal import butter, filtfilt
 # -------------------- PARAMETERS --------------------
 fs = 250                 # Sampling rate (Hz)
 window_size = 250        # Samples in one analysis window
-channels_to_use = [1, 2, 3]  # EEG channels to include in X
-frequency = [6,8,10,12]            # Frequency to test (Hz)
+channels_to_use = [1, 2, 3, 4, 5, 6]  # EEG channels to include in X
+frequency = [10,15,20,25]            # Frequency to test (Hz)
 
 calibration_limit = 500  # Number of samples to record baseline
 samples_counted = 0 # Keep track of current samples
