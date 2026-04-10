@@ -1,21 +1,30 @@
+import itertools
 import sys
 import numpy as np
 from pyOpenBCI import OpenBCICyton
 from sklearn.cross_decomposition import CCA
 from scipy.signal import butter, filtfilt
 
+spinner = itertools.cycle(["⠁  ", "⠃  ", "⠇  ", "⡇  ", "⣇  ", "⣧  ", "⣷  ", "⣿  ", "⣾  ", "⣼  ", "⣸  ", "⢸  ", "⠸  ", "⠘  ", "⠈  ", "   "])
+
 # -------------------- PARAMETERS --------------------
 fs = 250                 # Sampling rate (Hz)
 window_size = 250        # Samples in one analysis window
 channels_to_use = [1, 2, 3, 4, 5, 6]  # EEG channels to include in X
-frequency = [10,15,20,25]            # Frequency to test (Hz)
+frequency = [15,20,25,30]            # Frequency to test (Hz)
+
+frequency_distribution = {}
+
+for freq in frequency:
+	frequency_distribution[freq] = 0
+
 
 calibration_limit = 500  # Number of samples to record baseline
 samples_counted = 0 # Keep track of current samples
 is_calibrated = False # Are we calibrated??
 static_baseline = np.zeros(len(frequency)) # This will be our baseline once calibrated
 all_calib_corrs = [] # Temporary list to store correlations during lock-in
-threshold = 0.15 #Threshold for a "reading"
+threshold = 0.1 #Threshold for a "reading"
 
 # What the heck is Butterworth Bandpass Filter??? - we could look into this supposedly
 # it could help
@@ -36,7 +45,7 @@ for freq in frequency:
 	Y = np.stack(Y, axis=1)
 	Y_ref.append(Y)
 
-print("hi")
+#print("hi")
 # -------------------- CCA SETUP --------------------
 cca = CCA(n_components=1)
 
@@ -51,7 +60,10 @@ def bandpass(data, fs, low=5, high=40,order=4):
 
 # -------------------- PROCESSING FUNCTION --------------------
 def process_sample(sample):
-	global buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold
+	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold
+
+	if samples_counted % 30 == 0:
+		spin = next(spinner)
 
 	# 1. Shift buffer to the left to make room for new sample
 	buffer[:] = np.roll(buffer, -1, axis=1)
@@ -98,9 +110,18 @@ def process_sample(sample):
 		#Only print if the max is above some threshold - we can change this number
 		if np.max(relative_scores) > threshold:
 			best_freq_imp = np.argmax(relative_scores)
-			print(f"Detected: {frequency[best_freq_imp]} Hz")
+
+			frequency_distribution[frequency[best_freq_imp]] += 1
+
+			msg = f"Detected: {frequency[best_freq_imp]} Hz {spin}"
+			
+
 		else:
-			print("Searching...")
+			msg = f"Detected: -- Hz {spin}"
+		sys.stdout.write("\r" + msg)
+		sys.stdout.flush()
+
+		samples_counted += 1
 			
 		'''
 		#OLD CODE!!!!
@@ -120,7 +141,8 @@ def process_sample(sample):
 
 # -------------------- CONNECT TO BOARD --------------------
 try:
-	board = OpenBCICyton(port='/dev/cu.usbserial-D200QSOE')
+	#board = OpenBCICyton(port='/dev/cu.usbserial-D200QSOE')
+	board = OpenBCICyton(port='/dev/ttyUSB0')
 	print("Connected to OpenBCI Cyton.")
 except Exception as e:
 	print("Unable to connect to board:", e)
@@ -129,5 +151,6 @@ except Exception as e:
 try:
 	board.start_stream(process_sample)
 except KeyboardInterrupt:
+	print(f"Frequency Distribution: {frequency_distribution}")
 	print("Stopping stream...")
 	board.stop_stream()
