@@ -188,10 +188,10 @@ class EegPipeline:
             self.buffer = np.roll(self.buffer, -1, axis=1)
             self.buffer[:, -1] = sample.channels_data
 
-            if not np.all(self.buffer[:, -1] != 0):
+            idx = np.array(CHANNEL_INDICES_FOR_CCA, dtype=int)
+            if not np.all(self.buffer[idx, -1] != 0):
                 return
 
-            idx = np.array(CHANNEL_INDICES_FOR_CCA, dtype=int)
             x = self.buffer[idx].T
             x = bandpass_columns(x, SAMPLING_RATE_HZ)
 
