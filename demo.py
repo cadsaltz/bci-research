@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import queue
+
 import pygame
 
 # a panel is the box that flashes
@@ -72,9 +76,8 @@ class Grid:
 		w = self.rect.width // cols
 		h = self.rect.height // rows
 
-		# the frequencies in hertz of the flashing child panels
-		freqs = [15, 20, 25, 30]
-		#freqs = [10,16,23,31]
+		# Must overlap guess.py SSVEP targets (16 Hz, 31 Hz) for EEG subdivision
+		freqs = [16, 31, 16, 31]
 
 		i = 0
 		for r in range(rows):
@@ -147,8 +150,7 @@ WIDTH = 1500
 HEIGHT = 1000
 
 
-def main():
-	
+def main(detection_queue: queue.Queue[int] | None = None):
 	print(f"Size: {WIDTH} x {HEIGHT}")
 
 	# start the pygame
@@ -156,9 +158,8 @@ def main():
 	screen = pygame.display.set_mode((WIDTH, HEIGHT))
 	clock = pygame.time.Clock()
 
-	# initiatlize with a grid on the window
-	#root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
-	root = Panel((0,0,WIDTH,HEIGHT), 31, depth=0)
+	# Root grid so both 16 Hz and 31 Hz panels exist (matches guess.py)
+	root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
 	running = True
 
 	while running:
@@ -172,10 +173,19 @@ def main():
 
 			# if a click occurs, subdivde based on the position
 			if event.type == pygame.MOUSEBUTTONDOWN:
-				root.subdivide(pos=event.pos)
+				new_root = root.subdivide(pos=event.pos)
+				if new_root is not root:
+					root = new_root
 
-			# TO DO: subdivide based on the frequency observed from EEG data
-			# root.subdivide(freq = observed_freq)
+		if detection_queue is not None:
+			while True:
+				try:
+					observed_freq = detection_queue.get_nowait()
+				except queue.Empty:
+					break
+				new_root = root.subdivide(freq=observed_freq)
+				if new_root is not root:
+					root = new_root
 
 		# make the background of the window the same color as the inactive panels
 		screen.fill("Gray")
