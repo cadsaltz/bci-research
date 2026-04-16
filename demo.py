@@ -73,7 +73,8 @@ class Grid:
 		h = self.rect.height // rows
 
 		# the frequencies in hertz of the flashing child panels
-		freqs = [6, 8, 10, 12]
+		freqs = [15, 20, 25, 30]
+		#freqs = [10,16,23,31]
 
 		i = 0
 		for r in range(rows):
@@ -142,8 +143,8 @@ class Grid:
 
 
 # size of the window
-WIDTH = 1020
-HEIGHT = 1020
+WIDTH = 1500
+HEIGHT = 1000
 
 
 def main():
@@ -157,7 +158,7 @@ def main():
 
 	# initiatlize with a grid on the window
 	#root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
-	root = Panel((0,0,WIDTH,HEIGHT), 6, depth=0)
+	root = Panel((0,0,WIDTH,HEIGHT), 31, depth=0)
 	running = True
 
 	while running:
