@@ -55,7 +55,7 @@ class Panel:
 
 			# make it a new grid
 			new_grid = Grid(self.rect, depth = self.depth + 1)
-			print(f"Subdivisions by freq {freq}: {self.deth + 1}")
+			print(f"Subdivisions by freq {freq}: {self.depth + 1}")
 			return new_grid
 
 		# if nether cases are true, do nothing (stays a panel)
