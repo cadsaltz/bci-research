@@ -4,6 +4,7 @@ import itertools
 import queue
 import sys
 import threading
+import time
 import numpy as np
 from pyOpenBCI import OpenBCICyton
 from sklearn.cross_decomposition import CCA
@@ -31,8 +32,13 @@ static_baseline = np.zeros(len(frequency))  # This will be our baseline once cal
 all_calib_corrs = []  # Temporary list to store correlations during lock-in
 threshold = 0.1  # Threshold for a "reading"
 
+# After calibration: demo subdivision every this many seconds (winner = higher Δcorr vs baseline)
+SUBDIVISION_INTERVAL_S = 10.0
+
 # Optional: set from run_guess_demo — main thread (e.g. pygame) consumes int Hz values
 outbound_queue: queue.Queue[int] | None = None
+
+_last_subdivide_emit_s: float | None = None
 
 _pipeline_lock = threading.Lock()
 
@@ -73,6 +79,7 @@ def set_outbound_queue(q: queue.Queue[int] | None) -> None:
 # -------------------- PROCESSING FUNCTION --------------------
 def process_sample(sample):
 	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold
+	global _last_subdivide_emit_s
 
 	with _pipeline_lock:
 		if samples_counted % 30 == 0:
@@ -107,14 +114,19 @@ def process_sample(sample):
 			samples_counted += 1
 
 			if samples_counted % 25 == 0:
-				print(f"Calibrating... {int((samples_counted / calibration_limit) * 100)}%")  # Keep track of calibration
+				print(
+					f"Calibrating... {int((samples_counted / calibration_limit) * 100)}%",
+					file=sys.stderr,
+					flush=True,
+				)
 
 			# SET UP THE BASELINE - and send a message for it!
 			if samples_counted >= calibration_limit:
 				static_baseline = np.mean(all_calib_corrs, axis=0)
 				is_calibrated = True
-				print("--- CALIBRATION COMPLETE ---")
-				print(f"Baseline Noise Levels: {static_baseline}")
+				_last_subdivide_emit_s = time.monotonic()
+				print("--- CALIBRATION COMPLETE ---", file=sys.stderr, flush=True)
+				print(f"Baseline Noise Levels: {static_baseline}", file=sys.stderr, flush=True)
 
 			return  # exit early until we're done with calbration
 
@@ -127,18 +139,23 @@ def process_sample(sample):
 			freq = frequency[i]
 
 			if score > thresholds[freq]:
-
 				frequency_distribution[freq] += 1
 				msg = f"Detected: {freq} Hz {spin}"
-				if outbound_queue is not None:
-					try:
-						outbound_queue.put_nowait(int(freq))
-					except queue.Full:
-						pass
 				break
 
-		sys.stdout.write("\r" + msg)
-		sys.stdout.flush()
+		# Live line: stderr + flush so it still shows when stdout is fully buffered (e.g. with pygame)
+		print(msg, end="\r", file=sys.stderr, flush=True)
+
+		# Forced subdivision to demo: every SUBDIVISION_INTERVAL_S, pick whichever band has higher Δcorr
+		now = time.monotonic()
+		if _last_subdivide_emit_s is not None and now - _last_subdivide_emit_s >= SUBDIVISION_INTERVAL_S:
+			_last_subdivide_emit_s = now
+			winner = int(frequency[int(np.argmax(relative_scores))])
+			if outbound_queue is not None:
+				try:
+					outbound_queue.put_nowait(winner)
+				except queue.Full:
+					pass
 
 		samples_counted += 1
 
@@ -149,7 +166,7 @@ board: OpenBCICyton | None = None
 def connect_board(port: str = "/dev/ttyUSB0") -> OpenBCICyton:
 	global board
 	board = OpenBCICyton(port=port)
-	print("Connected to OpenBCI Cyton.")
+	print("Connected to OpenBCI Cyton.", file=sys.stderr, flush=True)
 	return board
 
 
@@ -167,13 +184,14 @@ if __name__ == "__main__":
 	try:
 		connect_board(port)
 	except Exception as e:
-		print("Unable to connect to board:", e)
+		print("Unable to connect to board:", e, file=sys.stderr, flush=True)
 		sys.exit(1)
 
 	try:
 		assert board is not None
 		board.start_stream(process_sample)
 	except KeyboardInterrupt:
-		print(f"Frequency Distribution: {frequency_distribution}")
-		print("Stopping stream...")
+		print(file=sys.stderr)
+		print(f"Frequency Distribution: {frequency_distribution}", file=sys.stderr, flush=True)
+		print("Stopping stream...", file=sys.stderr, flush=True)
 		stop_board()
