@@ -141,8 +141,8 @@ def _build_reference_templates() -> list[np.ndarray]:
     for f_hz in SSVEP_FREQUENCIES_HZ:
         cols: list[np.ndarray] = []
         for k in range(REFERENCE_HARMONIC_K_START, REFERENCE_HARMONIC_K_END_EXCLUSIVE):
-            cols.append(np.sin(float(2 * np.pi * k * f_hz * t)))
-            cols.append(np.cos(float(2 * np.pi * k * f_hz * t)))
+            cols.append(np.sin(2 * np.pi * k * f_hz * t))
+            cols.append(np.cos(2 * np.pi * k * f_hz * t))
         blocks.append(np.stack(cols, axis=1))
     return blocks
 
