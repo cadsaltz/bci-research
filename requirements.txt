@@ -1,7 +1,0 @@
-mne
-matplotlib
-numpy
-pygame
-pyOpenBCI
-scikit-learn
-scipy

@@ -18,6 +18,7 @@ window_size = 250        # Samples in one analysis window
 channels_to_use = [1, 2, 3, 4, 5, 6]  # EEG channels to include in X
 frequency = [16, 31]            # Frequency to test (Hz)
 thresholds = {16: 0.11, 31: 0.10}
+observed_freq = None
 
 frequency_distribution = {}
 
@@ -72,7 +73,7 @@ def set_outbound_queue(q: queue.Queue[int] | None) -> None:
 
 # -------------------- PROCESSING FUNCTION --------------------
 def process_sample(sample):
-	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold
+	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold, observed_freq
 
 	with _pipeline_lock:
 		if samples_counted % 30 == 0:
@@ -121,7 +122,7 @@ def process_sample(sample):
 		# Calculate the scores based off of the static baseline
 		relative_scores = np.array(current_corrs) - static_baseline  # Compare to our baseline - look at the change
 
-		msg = f"Detected: -- Hz {spin}"
+		msg = f"Detected: -- Hz Observed: {observed_freq} Hz {spin}"
 
 		for i, score in enumerate(relative_scores):
 			freq = frequency[i]
@@ -129,13 +130,24 @@ def process_sample(sample):
 			if score > thresholds[freq]:
 
 				frequency_distribution[freq] += 1
-				msg = f"Detected: {freq} Hz {spin}"
+
+				msg = f"Detected: {freq} Hz Observed: {observed_freq} Hz {spin}"
 				if outbound_queue is not None:
 					try:
 						outbound_queue.put_nowait(int(freq))
 					except queue.Full:
 						pass
 				break
+		
+
+		if samples_counted % 1000 == 0:
+			
+			observed_freq = max(frequency_distribution, key=frequency_distribution.get)
+
+			for key in frequency_distribution:
+				frequency_distribution[key] = 0
+
+
 
 		sys.stdout.write("\r" + msg)
 		sys.stdout.flush()
