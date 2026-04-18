@@ -1,5 +1,7 @@
 import pygame
-
+import shared_state
+import threading
+from guess import start_eeg
 # a panel is the box that flashes
 class Panel:
 	def __init__(self, rect, freq, depth=0):
@@ -67,31 +69,62 @@ class Grid:
 		self.active = True
 		self.rect = pygame.Rect(rect)
 		self.children = []
+		self.depth = depth
+
+		self.is_horizontal = (depth % 2 == 0)
 
 		# find the size of the child panels dynamically
 		w = self.rect.width // cols
-		h = self.rect.height // rows
+		h = self.rect.height
 
 		# the frequencies in hertz of the flashing child panels
-		freqs = [15, 20, 25, 30]
-		#freqs = [10,16,23,31]
+		freqs = [16,31]
 
-		i = 0
-		for r in range(rows):
-			for c in range(cols):
+		if self.is_horizontal:
+			w = self.rect.width // 2
+			h = self.rect.height
 
-				# make children rects
-				child_rect = (
-					self.rect.x + c * w,
-					self.rect.y + r * h,
-					w,
-					h
-				)
-				self.children.append(
-					Panel(child_rect, freqs[i % len(freqs)], depth=depth)
-				)
-				i += 1
-	
+			left_rect = (
+				self.rect.x,
+				self.rect.y,
+				w,
+				h
+			)
+
+			right_rect = (
+				self.rect.x + w,
+				self.rect.y,
+				w,
+				h
+			)
+
+			self.children = [
+				Panel(left_rect, freqs[0], depth=depth),
+				Panel(right_rect, freqs[1], depth=depth)
+			]
+		else:
+			w = self.rect.width
+			h = self.rect.height // 2
+
+			top_rect = (
+				self.rect.x,
+				self.rect.y,
+				w,
+				h
+			)
+
+			bottom_rect = (
+				self.rect.x,
+				self.rect.y + h,
+				w,
+				h
+			)
+
+			self.children = [
+				Panel(top_rect, freqs[0], depth=depth),
+				Panel(bottom_rect, freqs[1], depth=depth)
+			]
+
 	def update(self, now):
 
 		# if it is not activated (another panel was clicked), do nothing (dont update)
@@ -143,8 +176,8 @@ class Grid:
 
 
 # size of the window
-WIDTH = 1500
-HEIGHT = 1000
+WIDTH = 1000
+HEIGHT = 700
 
 
 def main():
@@ -157,9 +190,11 @@ def main():
 	clock = pygame.time.Clock()
 
 	# initiatlize with a grid on the window
-	#root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
-	root = Panel((0,0,WIDTH,HEIGHT), 31, depth=0)
+	root = Grid((0, 0, WIDTH, HEIGHT), depth=0)
+	#root = Panel((0,0,WIDTH,HEIGHT), 31, depth=0)
 	running = True
+
+	threading.Thread(target=start_eeg, daemon=True).start()
 
 	while running:
 
@@ -174,9 +209,12 @@ def main():
 			if event.type == pygame.MOUSEBUTTONDOWN:
 				root.subdivide(pos=event.pos)
 
-			# TO DO: subdivide based on the frequency observed from EEG data
-			# root.subdivide(freq = observed_freq)
-
+		
+		# TO DO: subdivide based on the frequency observed from EEG data
+		if shared_state.new_trigger:
+			shared_state.new_trigger = False
+			root = root.subdivide(freq=shared_state.observed_freq)
+				
 		# make the background of the window the same color as the inactive panels
 		screen.fill("Gray")
 
@@ -196,29 +234,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

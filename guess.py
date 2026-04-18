@@ -4,6 +4,7 @@ import numpy as np
 from pyOpenBCI import OpenBCICyton
 from sklearn.cross_decomposition import CCA
 from scipy.signal import butter, filtfilt
+import shared_state
 
 spinner = itertools.cycle(["⠁  ", "⠃  ", "⠇  ", "⡇  ", "⣇  ", "⣧  ", "⣷  ", "⣿  ", "⣾  ", "⣼  ", "⣸  ", "⢸  ", "⠸  ", "⠘  ", "⠈  ", "   "])
 
@@ -29,6 +30,10 @@ threshold = 0.1 #Threshold for a "reading"
 
 # What the heck is Butterworth Bandpass Filter??? - we could look into this supposedly
 # it could help
+
+#TIME
+windows_since_trigger = 0
+trigger_interval = 1000
 
 # -------------------- BUFFER --------------------
 buffer = np.zeros((8, window_size))  # 8 channels × window_size
@@ -61,7 +66,7 @@ def bandpass(data, fs, low=5, high=40,order=4):
 
 # -------------------- PROCESSING FUNCTION --------------------
 def process_sample(sample):
-	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold
+	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold, windows_since_trigger, trigger_interval
 
 	if samples_counted % 30 == 0:
 		spin = next(spinner)
@@ -107,19 +112,25 @@ def process_sample(sample):
 
 		# Calculate the scores based off of the static baseline
 		relative_scores = np.array(current_corrs) - static_baseline #Compare to our baseline - look at the change
-
+		windows_since_trigger += 1
+		print(windows_since_trigger)
 		#print(relative_scores)
 
 		msg = f"Detected: -- Hz {spin}"
 		
 		for i, score in enumerate(relative_scores):
 			freq = frequency[i]
-
 			if score > thresholds[freq]:
-
 				frequency_distribution[freq] += 1
 				msg = f"Detected: {freq} Hz {spin}"
 				break
+
+		if windows_since_trigger >= trigger_interval:
+			windows_since_trigger = 0
+			shared_state.observed_freq = frequency[np.argmax(relative_scores)]
+			shared_state.new_trigger = True
+			for key in frequency_distribution:
+				frequency_distribution[key] = 0
 
 			
 
@@ -159,17 +170,18 @@ def process_sample(sample):
 		'''
 
 # -------------------- CONNECT TO BOARD --------------------
-try:
-	#board = OpenBCICyton(port='/dev/cu.usbserial-D200QSOE')
-	board = OpenBCICyton(port='/dev/ttyUSB0')
-	print("Connected to OpenBCI Cyton.")
-except Exception as e:
-	print("Unable to connect to board:", e)
-	sys.exit(1)
+def start_eeg():
+	try:
+		board = OpenBCICyton(port='/dev/cu.usbserial-D200QSOE')
+		#board = OpenBCICyton(port='/dev/ttyUSB0')
+		print("Connected to OpenBCI Cyton.")
+	except Exception as e:
+		print("Unable to connect to board:", e)
+		
 
-try:
-	board.start_stream(process_sample)
-except KeyboardInterrupt:
-	print(f"Frequency Distribution: {frequency_distribution}")
-	print("Stopping stream...")
-	board.stop_stream()
+	try:
+		board.start_stream(process_sample)
+	except KeyboardInterrupt:
+		print(f"Frequency Distribution: {frequency_distribution}")
+		print("Stopping stream...")
+		board.stop_stream()
