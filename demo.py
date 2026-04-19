@@ -1,3 +1,4 @@
+import time
 import pygame
 import shared_state
 import threading
@@ -176,8 +177,8 @@ class Grid:
 
 
 # size of the window
-WIDTH = 1000
-HEIGHT = 700
+WIDTH = 1600
+HEIGHT = 1100
 
 
 def main():
@@ -196,6 +197,7 @@ def main():
 
 	threading.Thread(target=start_eeg, daemon=True).start()
 
+	time.sleep(5)
 	while running:
 
 		# set time each interation

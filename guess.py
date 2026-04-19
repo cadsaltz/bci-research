@@ -10,10 +10,10 @@ spinner = itertools.cycle(["⠁  ", "⠃  ", "⠇  ", "⡇  ", "⣇  ", "⣧  ",
 
 # -------------------- PARAMETERS --------------------
 fs = 250                 # Sampling rate (Hz)
-window_size = 250        # Samples in one analysis window
+window_size = 350        # Samples in one analysis window
 channels_to_use = [1, 2, 3, 4, 5, 6]  # EEG channels to include in X
 frequency = [16, 31]            # Frequency to test (Hz)
-thresholds = {16:0.11, 31:0.10}
+thresholds = {16:0.12, 31:0.09}
 
 frequency_distribution = {}
 
@@ -113,7 +113,7 @@ def process_sample(sample):
 		# Calculate the scores based off of the static baseline
 		relative_scores = np.array(current_corrs) - static_baseline #Compare to our baseline - look at the change
 		windows_since_trigger += 1
-		print(windows_since_trigger)
+		#print(windows_since_trigger)
 		#print(relative_scores)
 
 		msg = f"Detected: -- Hz {spin}"
@@ -127,7 +127,9 @@ def process_sample(sample):
 
 		if windows_since_trigger >= trigger_interval:
 			windows_since_trigger = 0
-			shared_state.observed_freq = frequency[np.argmax(relative_scores)]
+			print(f"Dist: {frequency_distribution}")
+			#shared_state.observed_freq = frequency[np.argmax(relative_scores)]
+			shared_state.observed_freq = max(frequency_distribution, key=frequency_distribution.get)
 			shared_state.new_trigger = True
 			for key in frequency_distribution:
 				frequency_distribution[key] = 0
@@ -172,8 +174,8 @@ def process_sample(sample):
 # -------------------- CONNECT TO BOARD --------------------
 def start_eeg():
 	try:
-		board = OpenBCICyton(port='/dev/cu.usbserial-D200QSOE')
-		#board = OpenBCICyton(port='/dev/ttyUSB0')
+		#board = OpenBCICyton(port='/dev/cu.usbserial-D200QSOE')
+		board = OpenBCICyton(port='/dev/ttyUSB0')
 		print("Connected to OpenBCI Cyton.")
 	except Exception as e:
 		print("Unable to connect to board:", e)
