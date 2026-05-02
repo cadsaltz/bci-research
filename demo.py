@@ -8,23 +8,24 @@ class Panel:
 	def __init__(self, rect, freq, depth=0):
 		self.rect = pygame.Rect(rect)
 		self.freq = freq
-		self.interval = 1000 / (freq * 2)
+		self.frames_per_toggle = round(60 / (freq * 2))
+		self.frame_count = 0
 		self.state = True
-		self.last_toggle = pygame.time.get_ticks()
 		self.active = True
 		self.depth = depth
 
-	
-	def update(self, now):
+
+	def update(self):
 
 		# if it is not activated (another panel was clicked), do nothing (dont update)
 		if not self.active:
-			return 
+			return
 
-		# toggle state based on the interval and the tick
-		if now - self.last_toggle >= self.interval:
+		# toggle state based on frame counting
+		self.frame_count += 1
+		if self.frame_count >= self.frames_per_toggle:
 			self.state = not self.state
-			self.last_toggle = now
+			self.frame_count = 0
 	
 	def draw(self, surface):
 
@@ -79,7 +80,7 @@ class Grid:
 		h = self.rect.height
 
 		# the frequencies in hertz of the flashing child panels
-		freqs = [16,31]
+		freqs = [10,15]
 
 		if self.is_horizontal:
 			w = self.rect.width // 2
@@ -126,15 +127,15 @@ class Grid:
 				Panel(bottom_rect, freqs[1], depth=depth)
 			]
 
-	def update(self, now):
+	def update(self):
 
 		# if it is not activated (another panel was clicked), do nothing (dont update)
 		if not self.active:
 			return
-		
+
 		# update its children
 		for child in self.children:
-			child.update(now)
+			child.update()
 
 
 	def draw(self, surface):
@@ -200,9 +201,6 @@ def main():
 	time.sleep(5)
 	while running:
 
-		# set time each interation
-		now = pygame.time.get_ticks()
-
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				running = False
@@ -211,17 +209,17 @@ def main():
 			if event.type == pygame.MOUSEBUTTONDOWN:
 				root.subdivide(pos=event.pos)
 
-		
+
 		# TO DO: subdivide based on the frequency observed from EEG data
 		if shared_state.new_trigger:
 			shared_state.new_trigger = False
 			root = root.subdivide(freq=shared_state.observed_freq)
-				
+
 		# make the background of the window the same color as the inactive panels
 		screen.fill("Gray")
 
 		# update the root and draw it
-		root.update(now)
+		root.update()
 		root.draw(screen)
 
 		pygame.display.flip()

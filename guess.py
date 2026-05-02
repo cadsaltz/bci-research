@@ -12,8 +12,9 @@ spinner = itertools.cycle(["⠁  ", "⠃  ", "⠇  ", "⡇  ", "⣇  ", "⣧  ",
 fs = 250                 # Sampling rate (Hz)
 window_size = 350        # Samples in one analysis window
 channels_to_use = [1, 2, 3, 4, 5, 6]  # EEG channels to include in X
-frequency = [16, 31]            # Frequency to test (Hz)
-thresholds = {16:0.12, 31:0.09}
+frequency = [10, 15]            # Frequency to test (Hz)
+thresholds = {10: 0.10, 15: 0.10}
+step_size = 50                   # Run CCA every 50 samples (~5x/sec)
 
 frequency_distribution = {}
 
@@ -23,6 +24,8 @@ for freq in frequency:
 
 calibration_limit = 500  # Number of samples to record baseline
 samples_counted = 0 # Keep track of current samples
+total_samples_received = 0       # Total samples fed into buffer
+samples_since_last_cca = 0       # Samples since last CCA run
 is_calibrated = False # Are we calibrated??
 static_baseline = np.zeros(len(frequency)) # This will be our baseline once calibrated
 all_calib_corrs = [] # Temporary list to store correlations during lock-in
@@ -33,7 +36,7 @@ threshold = 0.1 #Threshold for a "reading"
 
 #TIME
 windows_since_trigger = 0
-trigger_interval = 1000
+trigger_interval = 20
 
 # -------------------- BUFFER --------------------
 buffer = np.zeros((8, window_size))  # 8 channels × window_size
@@ -66,7 +69,7 @@ def bandpass(data, fs, low=5, high=40,order=4):
 
 # -------------------- PROCESSING FUNCTION --------------------
 def process_sample(sample):
-	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold, windows_since_trigger, trigger_interval
+	global spin, buffer, samples_counted, is_calibrated, static_baseline, all_calib_corrs, threshold, windows_since_trigger, trigger_interval, total_samples_received, samples_since_last_cca
 
 	if samples_counted % 30 == 0:
 		spin = next(spinner)
@@ -75,9 +78,12 @@ def process_sample(sample):
 	buffer[:] = np.roll(buffer, -1, axis=1)
 	# 2. Insert new sample
 	buffer[:, -1] = sample.channels_data
+	total_samples_received += 1
+	samples_since_last_cca += 1
 
-	# Only compute CCA after buffer is full
-	if np.all(buffer[:, -1] != 0):  
+	# Only compute CCA after buffer is full and enough new samples collected
+	if total_samples_received >= window_size and samples_since_last_cca >= step_size:
+		samples_since_last_cca = 0
 		
 		# 3. Build X matrix (time × features)
 		X = buffer[channels_to_use].T  # shape: (window_size, num_channels)
@@ -117,13 +123,12 @@ def process_sample(sample):
 		#print(relative_scores)
 
 		msg = f"Detected: -- Hz {spin}"
-		
-		for i, score in enumerate(relative_scores):
-			freq = frequency[i]
-			if score > thresholds[freq]:
-				frequency_distribution[freq] += 1
-				msg = f"Detected: {freq} Hz {spin}"
-				break
+
+		best_idx = np.argmax(relative_scores)
+		best_freq = frequency[best_idx]
+		if relative_scores[best_idx] > thresholds[best_freq]:
+			frequency_distribution[best_freq] += 1
+			msg = f"Detected: {best_freq} Hz {spin}"
 
 		if windows_since_trigger >= trigger_interval:
 			windows_since_trigger = 0
